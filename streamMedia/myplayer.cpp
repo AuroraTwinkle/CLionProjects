@@ -30,7 +30,6 @@ int ffplayer()
     int                i, videoindex;
     AVCodecContext    *pCodecCtx;
     AVCodec            *pCodec;
-    //char filepath[]="F:\\Work\\ffmpegdemo\\Debug\\Wildlife.wmv";
     char rtspUrl[] = "rtsp://192.168.6.66:8554/test3.mkv";
     av_register_all();//注册组件
     avformat_network_init();//支持网络流

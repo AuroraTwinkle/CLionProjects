@@ -7,7 +7,7 @@ include_directories(/aurora/ffmpeg/include /usr/local/include/SDL2)
 link_directories(/aurora/ffmpeg/lib /usr/local/lib)
 link_libraries(avformat avcodec avutil SDL2 swscale )
 
-add_executable(streamMedia myplayer.cpp testFFmpeg.cpp)
+add_executable(streamMedia  testFFmpeg.cpp)
 
 target_link_libraries(streamMedia avformat avcodec avutil SDL2 swscale)
 
