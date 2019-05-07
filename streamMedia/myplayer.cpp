@@ -34,7 +34,7 @@ int ffplayer()
     av_register_all();//注册组件
     avformat_network_init();//支持网络流
     pFormatCtx = avformat_alloc_context();//初始化AVFormatContext
-    if(avformat_open_input(&pFormatCtx,/*filepath*/rtspUrl,NULL,NULL)!=0){//打开文件或网络流
+    if(avformat_open_input(&pFormatCtx,/*filepath*/rtspUrl,NULL,NULL)!=0){
         printf("无法打开文件\n");
         return -1;
     }

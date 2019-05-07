@@ -30,6 +30,7 @@ void SaveFrame(AVFrame *pFrame, int width, int height, int iFrame) {
 
     // Write pixel data
     for(int y=0; y<height; y++)
+        //将每一帧的图片逐行写入ppm文件,y*pFrame->linesize[i]为每一行的指针偏移
         fwrite(pFrame->data[0]+y*pFrame->linesize[0], 1, width*3, pFile);
 
 
@@ -146,7 +147,7 @@ int main(int argc, char *argv[]) {
                           pFrameRGB->data, pFrameRGB->linesize);
 
                 // Save the frame to disk
-                if(++i<=10)
+                if(++i<=1)
                     SaveFrame(pFrameRGB, pCodecCtx->width, pCodecCtx->height,
                               i);
             }
