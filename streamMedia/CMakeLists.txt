@@ -3,8 +3,8 @@ project(streamMedia)
 
 set(CMAKE_CXX_STANDARD 11)
 
-include_directories(/aurora/ffmpeg/include /usr/local/include/SDL2)
-link_directories(/aurora/ffmpeg/lib /usr/local/lib)
+include_directories(/usr/local/ffmpeg/include /usr/local/include/SDL2)
+link_directories(/usr/local/ffmpeg/lib /usr/local/lib)
 link_libraries(avformat avcodec avutil SDL2 swscale )
 
 add_executable(streamMedia  testFFmpeg.cpp)
