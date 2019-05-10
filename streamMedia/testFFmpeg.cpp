@@ -57,7 +57,7 @@ int main(int argc, char* argv[])
 {
 
     AVFormatContext	*pFormatCtx;
-    int				i, videoindex;
+    int				i, videoStream,audioStream;
     AVCodecContext	*pCodecCtx;
     AVCodec			*pCodec;
     AVFrame	*pFrame,*pFrameYUV;
@@ -91,17 +91,29 @@ int main(int argc, char* argv[])
         printf("Couldn't find stream information.\n");
         return -1;
     }
-    videoindex=-1;
+    videoStream=-1;
+    audioStream=-1;
     for(i=0; i<pFormatCtx->nb_streams; i++)
-        if(pFormatCtx->streams[i]->codec->codec_type==AVMEDIA_TYPE_VIDEO){
-            videoindex=i;
-            break;
+    {
+        if(pFormatCtx->streams[i]->codec->codec_type==AVMEDIA_TYPE_VIDEO
+           &&
+           videoStream < 0) {
+            videoStream=i;
         }
-    if(videoindex==-1){
+        if(pFormatCtx->streams[i]->codec->codec_type==AVMEDIA_TYPE_AUDIO &&
+           audioStream < 0) {
+            audioStream=i;
+        }
+    }
+    if(audioStream==-1){
+        printf("Didn't find a audio stream.\n");
+        return -1;
+    }
+    if(videoStream==-1){
         printf("Didn't find a video stream.\n");
         return -1;
     }
-    pCodecCtx=pFormatCtx->streams[videoindex]->codec;
+    pCodecCtx=pFormatCtx->streams[videoStream]->codec;
     pCodec=avcodec_find_decoder(pCodecCtx->codec_id);
     if(pCodec==NULL){
         printf("Codec not found.\n");
@@ -165,7 +177,7 @@ int main(int argc, char* argv[])
                 if(av_read_frame(pFormatCtx, packet)<0)
                     thread_exit=1;
 
-                if(packet->stream_index==videoindex)
+                if(packet->stream_index==videoStream)
                     break;
             }
             ret = avcodec_decode_video2(pCodecCtx, pFrame, &got_picture, packet);
