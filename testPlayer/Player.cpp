@@ -7,19 +7,13 @@
 
 using namespace std;
 
-//struct para audio
-SwrContext *swrCtx = NULL;
+
+SwrContext *swrCtx = nullptr;
 AVFrame wanted_frame;
 
-AudioPacket audioq;
+AudioPacketQueue audioPacketQueue;
 
 void audio_callback(void *, Uint8 *, int);
-
-void Player::getDetailInfoStream(void) {
-
-    av_dump_format(pFormatCtx, 0, pFormatCtx->filename, 0);
-
-}
 
 void Player::getError(int erro) {
 
@@ -53,7 +47,7 @@ int Player::getCodecParameters() {
 }
 
 
-int Player::lerCodecVideo(void) {
+int Player::findCodec() {
 
     pCodec = avcodec_find_decoder(pCodecParameters->codec_id);
     pAudioCodec = avcodec_find_decoder(pCodecAudioParameters->codec_id);
@@ -115,7 +109,7 @@ int Player::lerCodecVideo(void) {
 }
 
 
-int Player::alocarMemoria(void) {
+int Player::alocarMemoria() {
 
     swrCtx = swr_alloc();
     if (nullptr == swrCtx) {
@@ -123,7 +117,7 @@ int Player::alocarMemoria(void) {
         exit(-1);
     }
 
-    //audio context
+
     av_opt_set_channel_layout(swrCtx, "in_channel_layout", pCodecAudioCtx->channel_layout, 0);
     av_opt_set_channel_layout(swrCtx, "out_channel_layout", pCodecAudioCtx->channel_layout, 0);
     av_opt_set_int(swrCtx, "in_sample_rate", pCodecAudioCtx->sample_rate, 0);
@@ -147,76 +141,59 @@ int Player::alocarMemoria(void) {
     wantedSpec.userdata = pCodecAudioCtx;
     wantedSpec.callback = audio_callback;
 
-    if (SDL_OpenAudio(&wantedSpec, &audioSpec) < 0) {
+    if (SDL_OpenAudio(&wantedSpec, nullptr) < 0) {
         cout << "Error opening audio" << endl;
         exit(-1);
     }
     wanted_frame.format = AV_SAMPLE_FMT_S16;
-    wanted_frame.sample_rate = audioSpec.freq;
-    wanted_frame.channel_layout = av_get_default_channel_layout(audioSpec.channels);
-    wanted_frame.channels = audioSpec.channels;
+    wanted_frame.sample_rate = wantedSpec.freq;
+    wanted_frame.channel_layout = av_get_default_channel_layout(wantedSpec.channels);
+    wanted_frame.channels = wantedSpec.channels;
 
-    initAudioPacket(&audioq);
+    initAudioPacket(&audioPacketQueue);
     SDL_PauseAudio(0);
 
     pFrame = av_frame_alloc();
-    if (pFrame == NULL) {
-        cout << "N�o foi possivel alocar a memoria do frame" << endl;
+    if (nullptr == pFrame) {
+        cout << "fail to allocate memo for pFrame" << endl;
         return -1;
     }
 
-    pFrameRGB = av_frame_alloc();
-    if (pFrameRGB == NULL) {
-        cout << "N�o foi possivel alocar a memoria do frame RGB" << endl;
-        return -1;
-    }
-
-    //ver essa quest�o do formato escolhido RGB24 ou YUV420p
-    int numBytes = av_image_get_buffer_size(FORMATO, pCodecCtx->width, pCodecCtx->height, 1);
-    cout << "qtd bytes=" << numBytes << endl;
-
-    //cria a mem�ria necess�ria para o buffer
-    buffer = (uint8_t *) av_malloc(numBytes * sizeof(uint8_t));
-
-    //associa o buffer ao Frame
-    res = av_image_fill_arrays(pFrameRGB->data, pFrameRGB->linesize, buffer, FORMATO, pCodecCtx->width,
-                               pCodecCtx->height, 1);
-    if (res < 0) {
-        getError(res);
-        return res;
-    }
     return 1;
 }
 
-void Player::initAudioPacket(AudioPacket *q) {
-    q->last = NULL;
-    q->first = NULL;
+
+void Player::initAudioPacket(AudioPacketQueue *q) {
+    q->last = nullptr;
+    q->first = nullptr;
+    q->nb_packets = 0;
+    q->size = 0;
     q->mutex = SDL_CreateMutex();
     q->cond = SDL_CreateCond();
 }
 
-int Player::putAudioPacket(AudioPacket *q, AVPacket *pkt) {
-    AVPacketList *pktl;
-    AVPacket *newPkt;
+int Player::putAudioPacket(AudioPacketQueue *q, AVPacket *pkt) {
+    AVPacketList *pPacketList = nullptr;
+    AVPacket *newPkt = nullptr;
     newPkt = (AVPacket *) av_mallocz_array(1, sizeof(AVPacket));
     if (av_packet_ref(newPkt, pkt) < 0)
         return -1;
 
-    pktl = (AVPacketList *) av_malloc(sizeof(AVPacketList));
-    if (!pktl)
+    pPacketList = (AVPacketList *) av_malloc(sizeof(AVPacketList));
+    if (!pPacketList)
         return -1;
 
-    pktl->pkt = *newPkt;
-    pktl->next = NULL;
+    pPacketList->pkt = *newPkt;
+    pPacketList->next = nullptr;
 
     SDL_LockMutex(q->mutex);
 
     if (!q->last)
-        q->first = pktl;
+        q->first = pPacketList;
     else
-        q->last->next = pktl;
+        q->last->next = pPacketList;
 
-    q->last = pktl;
+    q->last = pPacketList;
 
     q->nb_packets++;
     q->size += newPkt->size;
@@ -227,25 +204,25 @@ int Player::putAudioPacket(AudioPacket *q, AVPacket *pkt) {
     return 0;
 }
 
-int Player::getAudioPacket(AudioPacket *q, AVPacket *pkt, int block) {
+int Player::getAudioPacket(AudioPacketQueue *q, AVPacket *pkt, int block) {
 
-    AVPacketList *pktl;
-    int ret;
+    AVPacketList *pAvPacketList = nullptr;
+    int ret = 0;
 
     SDL_LockMutex(q->mutex);
 
-    while (1) {
-        pktl = q->first;
-        if (pktl) {
-            q->first = pktl->next;
+    while (true) {
+        pAvPacketList = q->first;
+        if (pAvPacketList) {
+            q->first = pAvPacketList->next;
             if (!q->first)
-                q->last = NULL;
+                q->last = nullptr;
 
             q->nb_packets--;
-            q->size -= pktl->pkt.size;
+            q->size -= pAvPacketList->pkt.size;
 
-            *pkt = pktl->pkt;
-            av_free(pktl);
+            *pkt = pAvPacketList->pkt;
+            av_free(pAvPacketList);
             ret = 1;
             break;
         } else if (!block) {
@@ -262,22 +239,27 @@ int Player::getAudioPacket(AudioPacket *q, AVPacket *pkt, int block) {
 
 }
 
-int audio_decode_frame(AVCodecContext *aCodecCtx, uint8_t *audio_buf, int buf_size) {
+int audio_decode_frame(AVCodecContext *aCodecCtx, uint8_t *audio_buf) {
 
     static AVPacket pkt;
-    static uint8_t *audio_pkt_data = NULL;
+    static uint8_t *audio_pkt_data = nullptr;
     static int audio_pkt_size = 0;
     static AVFrame frame;
 
-    int len1;
-    int data_size = 0;
+    int len1 = 0;
 
-    SwrContext *swr_ctx = NULL;
+    SwrContext *swr_ctx = nullptr;
 
-    while (1) {
+    while (true) {
+        if (pkt.data)
+            av_packet_unref(&pkt);
+
+        if (Player::getAudioPacket(&audioPacketQueue, &pkt, 1) < 0)
+            return -1;
+
+        audio_pkt_data = pkt.data;
+        audio_pkt_size = pkt.size;
         while (audio_pkt_size > 0) {
-            int got_frame = 0;
-
             avcodec_send_packet(aCodecCtx, &pkt);
             avcodec_receive_frame(aCodecCtx, &frame);
 
@@ -289,29 +271,20 @@ int audio_decode_frame(AVCodecContext *aCodecCtx, uint8_t *audio_buf, int buf_si
 
             audio_pkt_data += len1;
             audio_pkt_size -= len1;
-            data_size = 0;
-            if (got_frame) {
-                int linesize = 1;
-                data_size = av_samples_get_buffer_size(&linesize, aCodecCtx->channels, frame.nb_samples,
-                                                       aCodecCtx->sample_fmt, 1);
-                assert(data_size <= buf_size);
-                memcpy(audio_buf, frame.data[0], data_size);
-            }
-
-            if (frame.channels > 0 && frame.channel_layout == 0)
-                frame.channel_layout = av_get_default_channel_layout(frame.channels);
-            else if (frame.channels == 0 && frame.channel_layout > 0)
-                frame.channels = av_get_channel_layout_nb_channels(frame.channel_layout);
+//            if (frame.channels > 0 && frame.channel_layout == 0)
+//                frame.channel_layout = av_get_default_channel_layout(frame.channels);
+//            else if (frame.channels == 0 && frame.channel_layout > 0)
+//                frame.channels = av_get_channel_layout_nb_channels(frame.channel_layout);
 
             if (swr_ctx) {
                 swr_free(&swr_ctx);
-                swr_ctx = NULL;
+                swr_ctx = nullptr;
             }
 
-            swr_ctx = swr_alloc_set_opts(NULL, wanted_frame.channel_layout, (AVSampleFormat) wanted_frame.format,
+            swr_ctx = swr_alloc_set_opts(nullptr, wanted_frame.channel_layout, (AVSampleFormat) wanted_frame.format,
                                          wanted_frame.sample_rate,
                                          frame.channel_layout, (AVSampleFormat) frame.format, frame.sample_rate, 0,
-                                         NULL);
+                                         nullptr);
 
             if (!swr_ctx || swr_init(swr_ctx) < 0) {
                 cout << "swr_init failed" << endl;
@@ -328,28 +301,16 @@ int audio_decode_frame(AVCodecContext *aCodecCtx, uint8_t *audio_buf, int buf_si
             }
 
             return wanted_frame.channels * len2 * av_get_bytes_per_sample(AV_SAMPLE_FMT_S16);
-
-            if (data_size <= 0)
-                continue;
-
-            return data_size;
         }
 
-        if (pkt.data)
-            av_packet_unref(&pkt);
 
-        if (Player::getAudioPacket(&audioq, &pkt, 1) < 0)
-            return -1;
-
-        audio_pkt_data = pkt.data;
-        audio_pkt_size = pkt.size;
     }
 
 }
 
 void audio_callback(void *userdata, Uint8 *stream, int len) {
 
-    AVCodecContext *aCodecCtx = (AVCodecContext *) userdata;
+    auto *aCodecCtx = (AVCodecContext *) userdata;
     int len1, audio_size;
 
     static uint8_t audio_buff[192000 * 3 / 2];
@@ -360,7 +321,7 @@ void audio_callback(void *userdata, Uint8 *stream, int len) {
 
     while (len > 0) {
         if (audio_buf_index >= audio_buf_size) {
-            audio_size = audio_decode_frame(aCodecCtx, audio_buff, sizeof(audio_buff));
+            audio_size = audio_decode_frame(aCodecCtx, audio_buff);
             if (audio_size < 0) {
                 audio_buf_size = 1024;
                 memset(audio_buff, 0, audio_buf_size);
@@ -382,34 +343,21 @@ void audio_callback(void *userdata, Uint8 *stream, int len) {
 }
 
 
-int Player::lerFramesVideo(void) {
+int Player::lerFramesVideo() {
 
     AVPacket packet;
 
-    //video context
-    sws_ctx = sws_getContext(pCodecCtx->width,
-                             pCodecCtx->height,
-                             pCodecCtx->pix_fmt,
-                             pCodecCtx->width,
-                             pCodecCtx->height,
-                             FORMATO,
-                             SWS_BILINEAR,
-                             NULL,
-                             NULL,
-                             NULL
-    );
-    SDL_Event evt;
+    SDL_Event sdlEvent;
 
-    //lendo e colocando no packet
     while (av_read_frame(pFormatCtx, &packet) >= 0) {
 
         if (packet.stream_index == audioStream) {
-            putAudioPacket(&audioq, &packet);
+            putAudioPacket(&audioPacketQueue, &packet);
         }
-        //verifica��o se foi transmitido pelo Stream do Context
+
         if (packet.stream_index == videoStream) {
 
-            //processo de decodifica��o
+
             int res = avcodec_send_packet(pCodecCtx, &packet);
             if (res < 0) {
                 getError(res);
@@ -421,40 +369,39 @@ int Player::lerFramesVideo(void) {
                 getError(res);
                 continue;
             }
-            SDL_UpdateYUVTexture(bmp, NULL, pFrame->data[0], pFrame->linesize[0],
+            SDL_UpdateYUVTexture(sdlTexture, nullptr, pFrame->data[0], pFrame->linesize[0],
                                  pFrame->data[1], pFrame->linesize[1],
                                  pFrame->data[2], pFrame->linesize[2]);
-            SDL_RenderCopy(renderer, bmp, NULL, NULL);
+            SDL_RenderCopy(renderer, sdlTexture, nullptr, nullptr);
             SDL_RenderPresent(renderer);
             SDL_UpdateWindowSurface(screen);
             SDL_Delay(1000 / 30);
         }
 
-        //av_packet_unref(&packet);
-        SDL_PollEvent(&evt);
+        SDL_PollEvent(&sdlEvent);
     }
 
     return 1;
 
 }
 
-int Player::criarDisplay(void) {
+int Player::initSdlWindow() {
 
-    screen = SDL_CreateWindow("Video Player teste",
+    screen = SDL_CreateWindow("myStreamPlayer",
                               SDL_WINDOWPOS_CENTERED,
                               SDL_WINDOWPOS_CENTERED,
                               pCodecCtx->width, pCodecCtx->height,
                               SDL_WINDOW_OPENGL);
 
     if (!screen) {
-        cout << "N�o foi possivel setar a screen com o v�deo desse tamannho" << endl;
+        cout << "fail to init sdl_window." << endl;
         return -1;
     }
 
     renderer = SDL_CreateRenderer(screen, -1, 0);
 
-    bmp = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_YV12, SDL_TEXTUREACCESS_STATIC, pCodecCtx->width,
-                            pCodecCtx->height);
+    sdlTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_YV12, SDL_TEXTUREACCESS_STATIC, pCodecCtx->width,
+                                   pCodecCtx->height);
 
     return 1;
 }

@@ -31,7 +31,7 @@ int main(int argc, const char *argv[]) {
         exit(-1);
     }
 
-    res= player->criarDisplay();
+    player->initSdlWindow();
 
     res = player->lerFramesVideo();
     if (res < 0) {

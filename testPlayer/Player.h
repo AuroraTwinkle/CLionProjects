@@ -32,8 +32,7 @@ extern "C"
 
 
 #define ERROR_SIZE 128
-#define FORMATO AV_PIX_FMT_RGB24
-#define SDL_AUDIO_BUFFER_SIZE 1024;
+#define SDL_AUDIO_BUFFER_SIZE 2048
 
 
 typedef struct _AudioPacket {
@@ -41,14 +40,14 @@ typedef struct _AudioPacket {
     int nb_packets, size;
     SDL_mutex *mutex;
     SDL_cond *cond;
-} AudioPacket;
+} AudioPacketQueue;
 
 class Player {
 
 public:
 
     //construtor
-    Player(std::string endereco) {
+    explicit Player(const std::string& url) {
 
         audioStream = -1;
 
@@ -57,7 +56,7 @@ public:
         //av_dict_set(&option, "buffer_size", "425984", 0);
         //av_dict_set(&option, "max_delay", "500000", 0);
         //av_dict_set(&option, "timeout", "20000000", 0);
-        //av_dict_set(&option, "rtsp_transport", "udp", 0);
+        //av_dict_set(&option, "rtsp_transport", "tcp", 0);
 
         //init ffmpeg
         av_register_all();
@@ -65,7 +64,7 @@ public:
         avformat_network_init();
 
         //open video
-        int res = avformat_open_input(&pFormatCtx, endereco.c_str(), nullptr, &option);
+        int res = avformat_open_input(&pFormatCtx, url.c_str(), nullptr, &option);
 
         //check video opened
         if (res != 0) {
@@ -89,9 +88,10 @@ public:
             exit(-1);
         }
 
-        if (lerCodecVideo() < 0) exit(-1);
+        if (findCodec() < 0) exit(-1);
 
     }
+#pragma clang diagnostic pop
 
     ~Player(void) {
 
@@ -110,82 +110,66 @@ public:
     }
 
 
-    void getDetailInfoStream(void);
+    int alocarMemoria();
 
-    int alocarMemoria(void);
+    int lerFramesVideo();
 
-    int lerFramesVideo(void);
+    int initSdlWindow();
 
-    int criarDisplay(void);
-
-    static int getAudioPacket(AudioPacket *, AVPacket *, int);
+    static int getAudioPacket(AudioPacketQueue *, AVPacket *, int);
 
 private:
 
-    void memsetAudioPacket(AudioPacket *pq);
-
-    //armazena o �ndice do determinado Stream a ser transmitido
     int videoStream;
-
-    //stream de audio
     int audioStream;
 
-    //contem informa��es sobre o arquivo de v�deo, incluindo os codecs, etc
+
     AVFormatContext *pFormatCtx = NULL;
 
-    //contem informa��es do codec do v�deo, obtidas atraves de
-    //pFormatCtx->streams[i]->codecpar
-    //olhando o codec_type e vendo se � transmissao de video do tipo AVMEDIA_TYPE_VIDEO
     AVCodecParameters *pCodecParameters = NULL;
 
-    //Audio COdec Parametrs
+
     AVCodecParameters *pCodecAudioParameters = NULL;
 
-    //informa��es do codecParameters, por�m copiadas. o pCodecParameters serve como um backup das informa��es do v�deo
+
     AVCodecContext *pCodecCtx = NULL;
 
     AVCodecContext *pCodecAudioCtx = NULL;
 
-    SDL_AudioSpec wantedSpec = {0}, audioSpec = {0};
+    SDL_AudioSpec wantedSpec = {0};
 
-    //guarda o codec do v�deo
+
     AVCodec *pCodec = NULL;
 
-    //guarda o codec do audio
+
     AVCodec *pAudioCodec = NULL;
 
-    //estrutura que guarda o frame
+
     AVFrame *pFrame = NULL;
 
-    //estrutura que guarda o frame RGB
+
     AVFrame *pFrameRGB = NULL;
 
-    //buffer para leitura dos frames
+
     uint8_t *buffer = NULL;
 
-    //estrutura que armazena a convers�o para RGB
-    struct SwsContext *sws_ctx = NULL;
 
-    //surface window para exibir o video
-    //pode ter m�ltiplas screens
-    SDL_Window *screen;
+    SDL_Window *screen{};
 
-    SDL_Renderer *renderer;
+    SDL_Renderer *renderer{};
 
-    SDL_Texture *bmp;
+    SDL_Texture *sdlTexture{};
 
-    //exibe o erro com rela��o ao seu respectivo c�digo
-    void getError(int erro);
 
-    int getCodecParameters(void);
+    static void getError(int erro);
 
-    int lerCodecVideo(void);
+    int getCodecParameters();
 
-    int PacketQueuePut(AudioPacket *, const AVPacket *);
+    int findCodec();
 
-    void initAudioPacket(AudioPacket *);
+    static void initAudioPacket(AudioPacketQueue *);
 
-    int putAudioPacket(AudioPacket *, AVPacket *);
+    static int putAudioPacket(AudioPacketQueue *, AVPacket *);
 
 };
 
