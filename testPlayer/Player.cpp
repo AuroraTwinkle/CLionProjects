@@ -349,6 +349,7 @@ int Player::lerFramesVideo() {
 
     SDL_Event sdlEvent;
 
+    int numFrames=0;
     while (av_read_frame(pFormatCtx, &packet) >= 0) {
 
         if (packet.stream_index == audioStream) {
@@ -375,7 +376,9 @@ int Player::lerFramesVideo() {
             SDL_RenderCopy(renderer, sdlTexture, nullptr, nullptr);
             SDL_RenderPresent(renderer);
             SDL_UpdateWindowSurface(screen);
-            SDL_Delay(1000 / 30);
+            cout<<numFrames<<endl;
+            numFrames++;
+            //SDL_Delay(1000 / 30);
         }
 
         SDL_PollEvent(&sdlEvent);

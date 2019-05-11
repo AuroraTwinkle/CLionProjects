@@ -96,7 +96,6 @@ public:
     ~Player(void) {
 
         av_free(buffer);
-        av_free(pFrameRGB);
 
         // Free the YUV frame
         av_free(pFrame);
@@ -146,9 +145,6 @@ private:
 
 
     AVFrame *pFrame = NULL;
-
-
-    AVFrame *pFrameRGB = NULL;
 
 
     uint8_t *buffer = NULL;
