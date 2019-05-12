@@ -15,6 +15,8 @@ extern "C"{
 }
 #endif
 
+#include <memory>
+#include "PacketQueue.h"
 #include "MyLog.h"
 
 class Demuxer {
@@ -24,7 +26,8 @@ public:
     virtual ~Demuxer();
 
 public:
-    bool openUrl(char const*url);
+    bool openUrl(const std::string& url);
+    bool readFrame(const std::shared_ptr<PacketQueue>& ptrVideo,const std::shared_ptr<PacketQueue>& ptrAudio);
 private:
     AVFormatContext *pAvFormatContext;
     AVCodecParameters* pAvCodecVideoParameters;

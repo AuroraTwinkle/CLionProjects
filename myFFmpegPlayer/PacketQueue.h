@@ -13,10 +13,17 @@ extern "C"{
 #ifdef __cplusplus
 }
 #endif
+
+#include "MyLog.h"
 class PacketQueue {
 public:
     PacketQueue();
 
+    virtual ~PacketQueue();
+
+public:
+    bool addPacket(AVPacket *avPacket);
+    bool getPacket(AVPacket &avPacket,int block);
 private:
     AVPacketList *pLast;
     AVPacketList *pFirst;
@@ -24,6 +31,7 @@ private:
     int nb_packets;
     SDL_mutex* pSdlMutex;
     SDL_cond* pSdlCond;
+    MyLog log;
 };
 
 

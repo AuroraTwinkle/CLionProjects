@@ -6,6 +6,7 @@
 
 Demuxer::Demuxer() {
     av_register_all();
+    //avformat_network_init();
     this->audioStream = -1;
     this->videoStream = -1;
     this->pAvCodecAudioParameters = nullptr;
@@ -14,8 +15,8 @@ Demuxer::Demuxer() {
     this->option = nullptr;
     av_dict_set(&option, "buffer_size", "425984", 0);
     av_dict_set(&option, "max_delay", "500000", 0);
-    av_dict_set(&option, "timeout", "20000000", 0);
-    av_dict_set(&option, "rtsp_transport", "tcp", 0);
+    //av_dict_set(&option, "timeout", "20000000", 0);
+    av_dict_set(&option, "rtsp_transport", "udp", 0);
 }
 
 Demuxer::~Demuxer() {
@@ -24,9 +25,9 @@ Demuxer::~Demuxer() {
     avcodec_parameters_free(&this->pAvCodecAudioParameters);
 }
 
-bool Demuxer::openUrl(char const *url) {
+bool Demuxer::openUrl(const std::string& url) {
 
-    int ret = avformat_open_input(&this->pAvFormatContext, url, nullptr, &option);
+    int ret = avformat_open_input(&pAvFormatContext, url.c_str(), nullptr, &option);
     if (ret != 0) {
         log("fail to open the file or net stream.");
         return false;
@@ -63,4 +64,17 @@ AVCodecParameters *Demuxer::getPAvCodecVideoParameters() const {
 
 AVCodecParameters *Demuxer::getPAvCodecAudioParameters() const {
     return this->pAvCodecAudioParameters;
+}
+
+bool Demuxer::readFrame(const std::shared_ptr<PacketQueue>& ptrVideo, const std::shared_ptr<PacketQueue>& ptrAudio) {
+    AVPacket avPacket;
+    while (av_read_frame(this->pAvFormatContext,&avPacket)>=0){
+        if(videoStream == avPacket.stream_index){
+            ptrVideo->addPacket(&avPacket);
+        }
+        if(audioStream == avPacket.stream_index){
+            ptrAudio->addPacket(&avPacket);
+        }
+    }
+    return true;
 }
