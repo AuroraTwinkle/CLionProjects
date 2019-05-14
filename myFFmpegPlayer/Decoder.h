@@ -14,15 +14,20 @@ extern "C"{
 #endif
 
 #include "MyLog.h"
+#include "PacketQueue.h"
+#include <memory>
 
+#include <thread>
 class Decoder {
 public:
+    Decoder();
     explicit Decoder(AVCodecParameters* pAvCodecParameters);
-
     virtual ~Decoder();
 
 public:
     bool initDecoder();
+    bool startDecode(const std::shared_ptr<PacketQueue>& pPacketQueue,AVFrame *avFrame);
+    AVCodecContext* getPavCodecContext()const ;
 private:
     AVCodec* pAvCodec;
     AVCodecContext* pAvCodecContext;

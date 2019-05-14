@@ -14,7 +14,11 @@ extern "C"{
 }
 #endif
 
+#include <list>
+#include <condition_variable>
+#include <mutex>
 #include "MyLog.h"
+
 class PacketQueue {
 public:
     PacketQueue();
@@ -22,15 +26,14 @@ public:
     virtual ~PacketQueue();
 
 public:
-    bool addPacket(AVPacket *avPacket);
+    bool addPacket(const AVPacket &avPacket);
     bool getPacket(AVPacket &avPacket,int block);
+    int getNumPackets() const ;
 private:
-    AVPacketList *pLast;
-    AVPacketList *pFirst;
+    std::list<AVPacket> packetList;
     int size;
-    int nb_packets;
-    SDL_mutex* pSdlMutex;
-    SDL_cond* pSdlCond;
+    std::mutex mutex;
+    std::condition_variable conditionVariable;
     MyLog log;
 };
 

@@ -3,10 +3,10 @@
 //
 
 #include "Demuxer.h"
-
+#include <thread>
+#include <chrono>
 Demuxer::Demuxer() {
     av_register_all();
-    //avformat_network_init();
     this->audioStream = -1;
     this->videoStream = -1;
     this->pAvCodecAudioParameters = nullptr;
@@ -15,7 +15,6 @@ Demuxer::Demuxer() {
     this->option = nullptr;
     av_dict_set(&option, "buffer_size", "425984", 0);
     av_dict_set(&option, "max_delay", "500000", 0);
-    //av_dict_set(&option, "timeout", "20000000", 0);
     av_dict_set(&option, "rtsp_transport", "udp", 0);
 }
 
@@ -55,6 +54,7 @@ bool Demuxer::openUrl(const std::string& url) {
         this->pAvCodecAudioParameters=pAvFormatContext->streams[audioStream]->codecpar;
     }
     log("succeed to open file.");
+    av_dump_format(pAvFormatContext,0,url.c_str(),0);
     return true;
 }
 
@@ -70,10 +70,14 @@ bool Demuxer::readFrame(const std::shared_ptr<PacketQueue>& ptrVideo, const std:
     AVPacket avPacket;
     while (av_read_frame(this->pAvFormatContext,&avPacket)>=0){
         if(videoStream == avPacket.stream_index){
-            ptrVideo->addPacket(&avPacket);
+            //std::cout<<ptrVideo->getNumPackets()<<std::endl;
+            if(ptrVideo->getNumPackets()>1000){
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));//阻塞10毫秒
+            }
+            ptrVideo->addPacket(avPacket);
         }
         if(audioStream == avPacket.stream_index){
-            ptrAudio->addPacket(&avPacket);
+            ptrAudio->addPacket(avPacket);
         }
     }
     return true;

@@ -29,6 +29,32 @@ bool Decoder::initDecoder() {
 }
 
 Decoder::~Decoder() {
-    avcodec_free_context(&this->pAvCodecContext);
-    avcodec_parameters_free(&this->pAvCodecParameters);
+    if(!pAvCodecContext){
+        avcodec_free_context(&this->pAvCodecContext);
+    }
+    if(!pAvCodecParameters){
+        avcodec_parameters_free(&this->pAvCodecParameters);
+    }
+
 }
+
+bool Decoder::startDecode(const std::shared_ptr<PacketQueue>& pPacketQueue,AVFrame *avFrame) {
+    AVPacket avPacket;
+    if(pPacketQueue->getPacket(avPacket,1))
+    {
+        avcodec_send_packet(pAvCodecContext,&avPacket);
+        avcodec_receive_frame(pAvCodecContext,avFrame);
+        return true;
+    }
+    return false;
+}
+
+Decoder::Decoder() {
+
+}
+
+AVCodecContext *Decoder::getPavCodecContext() const {
+    return this->pAvCodecContext;
+}
+
+

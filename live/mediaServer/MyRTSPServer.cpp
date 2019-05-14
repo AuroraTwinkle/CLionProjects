@@ -87,7 +87,7 @@ static ServerMediaSession* createNewSMS(UsageEnvironment& env,
   Boolean const reuseSource = False;
   if (strcmp(extension, ".mkv") == 0) {
     
-    OutPacketBuffer::maxSize = 300000; 
+    OutPacketBuffer::maxSize = 1000000; 
     NEW_SMS("Matroska video+audio+(optional)subtitles");
 
     MatroskaDemuxCreationState creationState;
