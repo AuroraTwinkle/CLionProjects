@@ -24,34 +24,10 @@ int main(int argc,const char *argv[]) {
     }
     std::thread demuxThread(&SDLDisplay::startDemuxer,&player);
     demuxThread.detach();
+    std::thread playAudio(&SDLDisplay::playAudio,&player);
+    playAudio.detach();
     std::thread drawingThread(&SDLDisplay::drawing,&player);
     drawingThread.join();
-
-//    MyLog log;
-//    Demuxer demuxer= Demuxer();
-//    std::shared_ptr<PacketQueue> pPacketQueueVideo(new PacketQueue());
-//    std::shared_ptr<PacketQueue> pPacketQueueAudio(new PacketQueue());
-//
-//
-//    if(2 > argc){
-//        log("not enough environment parameter.");
-//        return 0;
-//    }
-//    demuxer.openUrl(argv[1]);
-//
-//    Decoder pDecoderVideo=Decoder(demuxer.getPAvCodecVideoParameters());
-//
-//    pDecoderVideo.initDecoder();
-//
-//
-//    std::thread th(&Decoder::startDecode,&pDecoderVideo,pPacketQueueVideo);
-//
-//    th.detach();
-//
-//    std::thread th1(&Demuxer::readFrame,&demuxer,pPacketQueueVideo,pPacketQueueAudio);
-//    th1.join();
-
-
 
     return 0;
 }

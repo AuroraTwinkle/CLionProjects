@@ -18,6 +18,7 @@ extern "C"{
 #include "Decoder.h"
 #include "PacketQueue.h"
 #include "Demuxer.h"
+#include "AudioConverter.h"
 #include <string>
 #include <thread>
 
@@ -31,21 +32,22 @@ public:
     bool initSDL2(const std::string& windowName, const std::string &url);
     void startDemuxer();
     void drawing();
+    void playAudio();
 private:
     bool initAudioSpec();
-    void audio_callback(void *userdata, Uint8 *stream, int len);
-    int audio_decode_frame(AVCodecContext *pContext, uint8_t *buff);
+    //void audio_callback(int len);
+    int decodeAudioFrame(uint8_t *buff);
 private:
     SDL_Window *window;
     SDL_Renderer* renderer;
     SDL_Texture* texture;
     SDL_AudioSpec wantAudioSpec;
-    SwrContext* pSwrContextAudio;
     AVCodecContext* pAvCodecContext;
     AVFrame wantFrame;
     Demuxer demuxer;
     Decoder videoDecoder;
     Decoder audioDecoder;
+    AudioConverter audioConverter;
     std::shared_ptr<PacketQueue> packetQueueVideo;
     std::shared_ptr<PacketQueue> packetQueueAudio;
     MyLog log;

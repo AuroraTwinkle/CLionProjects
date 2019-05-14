@@ -71,12 +71,15 @@ bool Demuxer::readFrame(const std::shared_ptr<PacketQueue>& ptrVideo, const std:
     while (av_read_frame(this->pAvFormatContext,&avPacket)>=0){
         if(videoStream == avPacket.stream_index){
             //std::cout<<ptrVideo->getNumPackets()<<std::endl;
-            if(ptrVideo->getNumPackets()>1000){
+            if(ptrVideo->getNumPackets()>3000){
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));//阻塞10毫秒
             }
             ptrVideo->addPacket(avPacket);
         }
         if(audioStream == avPacket.stream_index){
+            if(ptrAudio->getNumPackets()>3000){
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));//阻塞10毫秒
+            }
             ptrAudio->addPacket(avPacket);
         }
     }
