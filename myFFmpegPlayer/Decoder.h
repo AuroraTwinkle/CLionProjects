@@ -28,11 +28,14 @@ public:
     bool initDecoder();
     bool startDecode(const std::shared_ptr<PacketQueue>& pPacketQueue,AVFrame *avFrame);
     AVCodecContext* getPavCodecContext()const ;
+    double getPTS(AVStream *avStream, AVFrame *avFrame);
 private:
     AVCodec* pAvCodec;
     AVCodecContext* pAvCodecContext;
     AVCodecParameters* pAvCodecParameters;
     MyLog log;
+
+
 };
 
 

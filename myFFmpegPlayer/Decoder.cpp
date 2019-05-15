@@ -49,12 +49,22 @@ bool Decoder::startDecode(const std::shared_ptr<PacketQueue>& pPacketQueue,AVFra
     return false;
 }
 
-Decoder::Decoder() {
-
-}
+Decoder::Decoder() = default;
 
 AVCodecContext *Decoder::getPavCodecContext() const {
     return this->pAvCodecContext;
+}
+
+double Decoder::getPTS(AVStream *avStream, AVFrame *avFrame) {
+
+    double pts = 0.0;
+    pts = av_frame_get_best_effort_timestamp(avFrame);
+    if (pts == AV_NOPTS_VALUE) {
+        pts = 0;
+    }
+    pts *= av_q2d(avStream->time_base);
+
+    return pts;
 }
 
 

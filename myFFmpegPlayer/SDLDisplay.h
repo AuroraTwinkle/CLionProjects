@@ -43,6 +43,8 @@ private:
     SDL_Texture* texture;
     SDL_AudioSpec wantAudioSpec;
     AVCodecContext* pAvCodecContext;
+    AVStream *pAvStreamVideo;
+    AVStream *pAvStreamAudio;
     AVFrame wantFrame;
     Demuxer demuxer;
     Decoder videoDecoder;
@@ -51,6 +53,15 @@ private:
     std::shared_ptr<PacketQueue> packetQueueVideo;
     std::shared_ptr<PacketQueue> packetQueueAudio;
     MyLog log;
+
+    int delay;
+    double audioClock;
+    double videoClock;
+    double preFramePTS;
+    double curFramePTS;
+    double preCurFramePTS;
+
+    double getDelay();
 };
 
 

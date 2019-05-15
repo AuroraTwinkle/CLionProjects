@@ -35,6 +35,8 @@ public:
     AVCodecParameters *getPAvCodecVideoParameters() const;
 
     AVCodecParameters *getPAvCodecAudioParameters() const;
+    AVStream *getPavStreamVideo() const;
+    AVStream *getPavStreamAudio() const;
 
 private:
     AVCodecParameters* pAvCodecAudioParameters;

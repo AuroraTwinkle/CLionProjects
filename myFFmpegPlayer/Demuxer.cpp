@@ -85,3 +85,11 @@ bool Demuxer::readFrame(const std::shared_ptr<PacketQueue>& ptrVideo, const std:
     }
     return true;
 }
+
+AVStream *Demuxer::getPavStreamVideo() const {
+    return pAvFormatContext->streams[videoStream];
+}
+
+AVStream *Demuxer::getPavStreamAudio() const {
+    return pAvFormatContext->streams[audioStream];
+}
