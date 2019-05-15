@@ -27,6 +27,7 @@ public:
 public:
     bool initDecoder();
     bool startDecode(const std::shared_ptr<PacketQueue>& pPacketQueue,AVFrame *avFrame);
+    double getPTS(AVStream* avStream,AVFrame *avFrame);
     AVCodecContext* getPavCodecContext()const ;
 private:
     AVCodec* pAvCodec;

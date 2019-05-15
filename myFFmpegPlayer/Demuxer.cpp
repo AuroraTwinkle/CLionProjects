@@ -5,6 +5,7 @@
 #include "Demuxer.h"
 #include <thread>
 #include <chrono>
+
 Demuxer::Demuxer() {
     av_register_all();
     this->audioStream = -1;
@@ -20,11 +21,19 @@ Demuxer::Demuxer() {
 
 Demuxer::~Demuxer() {
     avformat_close_input(&this->pAvFormatContext);
-    avcodec_parameters_free(&this->pAvCodecVideoParameters);
-    avcodec_parameters_free(&this->pAvCodecAudioParameters);
+    if (pAvCodecAudioParameters) {
+        avcodec_parameters_free(&this->pAvCodecAudioParameters);
+        pAvCodecAudioParameters = nullptr;
+    }
+    if (pAvCodecVideoParameters) {
+        avcodec_parameters_free(&this->pAvCodecVideoParameters);
+        pAvCodecVideoParameters = nullptr;
+    }
+
+
 }
 
-bool Demuxer::openUrl(const std::string& url) {
+bool Demuxer::openUrl(const std::string &url) {
 
     int ret = avformat_open_input(&pAvFormatContext, url.c_str(), nullptr, &option);
     if (ret != 0) {
@@ -45,16 +54,16 @@ bool Demuxer::openUrl(const std::string& url) {
         }
         if (0 > this->videoStream && 0 > this->audioStream)break;
     }
-    if(0 > this->videoStream){
+    if (0 > this->videoStream) {
         log("fail to find any video stream.");
         return false;
     }
-    this->pAvCodecVideoParameters=pAvFormatContext->streams[videoStream]->codecpar;
-    if(0 < this->audioStream){
-        this->pAvCodecAudioParameters=pAvFormatContext->streams[audioStream]->codecpar;
+    this->pAvCodecVideoParameters = pAvFormatContext->streams[videoStream]->codecpar;
+    if (0 < this->audioStream) {
+        this->pAvCodecAudioParameters = pAvFormatContext->streams[audioStream]->codecpar;
     }
     log("succeed to open file.");
-    av_dump_format(pAvFormatContext,0,url.c_str(),0);
+    av_dump_format(pAvFormatContext, 0, url.c_str(), 0);
     return true;
 }
 
@@ -66,22 +75,30 @@ AVCodecParameters *Demuxer::getPAvCodecAudioParameters() const {
     return this->pAvCodecAudioParameters;
 }
 
-bool Demuxer::readFrame(const std::shared_ptr<PacketQueue>& ptrVideo, const std::shared_ptr<PacketQueue>& ptrAudio) {
+bool Demuxer::readFrame(const std::shared_ptr<PacketQueue> &ptrVideo, const std::shared_ptr<PacketQueue> &ptrAudio) {
     AVPacket avPacket;
-    while (av_read_frame(this->pAvFormatContext,&avPacket)>=0){
-        if(videoStream == avPacket.stream_index){
+    while (av_read_frame(this->pAvFormatContext, &avPacket) >= 0) {
+        if (videoStream == avPacket.stream_index) {
             //std::cout<<ptrVideo->getNumPackets()<<std::endl;
-            if(ptrVideo->getNumPackets()>3000){
+            if (ptrVideo->getNumPackets() > 3000) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));//阻塞10毫秒
             }
             ptrVideo->addPacket(avPacket);
         }
-        if(audioStream == avPacket.stream_index){
-            if(ptrAudio->getNumPackets()>3000){
+        if (audioStream == avPacket.stream_index) {
+            if (ptrAudio->getNumPackets() > 3000) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));//阻塞10毫秒
             }
             ptrAudio->addPacket(avPacket);
         }
     }
     return true;
+}
+
+AVStream *Demuxer::getPavStreamVideo() const {
+    return pAvFormatContext->streams[videoStream];
+}
+
+AVStream *Demuxer::getPavStreamAudio() const {
+    return pAvFormatContext->streams[audioStream];
 }

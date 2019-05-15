@@ -6,7 +6,7 @@
 #define MYFFMPEGPLAYER_DEMUXER_H
 
 #ifdef __cplusplus
-extern "C"{
+extern "C" {
 #endif
 
 #include <libavformat/avformat.h>
@@ -26,19 +26,24 @@ public:
     virtual ~Demuxer();
 
 public:
-    bool openUrl(const std::string& url);
-    bool readFrame(const std::shared_ptr<PacketQueue>& ptrVideo,const std::shared_ptr<PacketQueue>& ptrAudio);
+    bool openUrl(const std::string &url);
+
+    bool readFrame(const std::shared_ptr<PacketQueue> &ptrVideo, const std::shared_ptr<PacketQueue> &ptrAudio);
+
 private:
     AVFormatContext *pAvFormatContext;
-    AVCodecParameters* pAvCodecVideoParameters;
+    AVCodecParameters *pAvCodecVideoParameters;
 public:
     AVCodecParameters *getPAvCodecVideoParameters() const;
 
     AVCodecParameters *getPAvCodecAudioParameters() const;
 
+    AVStream *getPavStreamVideo() const;
+    AVStream *getPavStreamAudio() const;
+
 private:
-    AVCodecParameters* pAvCodecAudioParameters;
-    AVDictionary* option;
+    AVCodecParameters *pAvCodecAudioParameters;
+    AVDictionary *option;
     int videoStream;
     int audioStream;
     MyLog log;

@@ -5,8 +5,10 @@
 #include "SDLDisplay.h"
 
 
-SDLDisplay::SDLDisplay() : demuxer(Demuxer()), window(nullptr), texture(
-        nullptr), renderer(nullptr), pAvCodecContext(nullptr) {}
+SDLDisplay::SDLDisplay() : delay(0), playState(1), pAvStreamAudio(nullptr), pAvStreamVideo(nullptr), demuxer(Demuxer()),
+                           window(nullptr),
+                           texture(
+                                   nullptr), renderer(nullptr), pAvCodecContext(nullptr) {}
 
 bool SDLDisplay::initSDL2(const std::string &windowName, const std::string &url) {
 
@@ -20,6 +22,7 @@ bool SDLDisplay::initSDL2(const std::string &windowName, const std::string &url)
     this->packetQueueAudio = std::make_shared<PacketQueue>();
     this->packetQueueVideo = std::make_shared<PacketQueue>();
 
+
     this->window = SDL_CreateWindow(windowName.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                                     demuxer.getPAvCodecVideoParameters()->width,
                                     demuxer.getPAvCodecVideoParameters()->height, SDL_WINDOW_OPENGL);
@@ -27,14 +30,26 @@ bool SDLDisplay::initSDL2(const std::string &windowName, const std::string &url)
     this->texture = SDL_CreateTexture(this->renderer, SDL_PIXELFORMAT_YV12, SDL_TEXTUREACCESS_STATIC,
                                       demuxer.getPAvCodecVideoParameters()->width,
                                       demuxer.getPAvCodecVideoParameters()->height);
+    this->pAvStreamVideo = demuxer.getPavStreamVideo();
+    this->pAvStreamAudio = demuxer.getPavStreamAudio();
     return true;
 }
 
 
 SDLDisplay::~SDLDisplay() {
-    SDL_DestroyWindow(window);
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyTexture(texture);
+    if (window) {
+        SDL_DestroyWindow(window);
+        window = nullptr;
+    }
+    if (renderer) {
+        SDL_DestroyRenderer(renderer);
+        renderer = nullptr;
+    }
+    if (texture) {
+        SDL_DestroyTexture(texture);
+        texture = nullptr;
+    }
+
 }
 
 
@@ -43,21 +58,36 @@ void SDLDisplay::drawing() {
     AVFrame *pFrame = nullptr;
     pFrame = av_frame_alloc();
 
-    while (true) {
-        if (videoDecoder.startDecode(packetQueueVideo, pFrame)) {
-            SDL_UpdateYUVTexture(texture, nullptr, pFrame->data[0], pFrame->linesize[0],
-                                 pFrame->data[1], pFrame->linesize[1],
-                                 pFrame->data[2], pFrame->linesize[2]);
-            SDL_RenderCopy(renderer, texture, nullptr, nullptr);
-            SDL_RenderPresent(renderer);
-            SDL_UpdateWindowSurface(window);
+
+    if (videoDecoder.startDecode(packetQueueVideo, pFrame)) {
+
+        double pts = videoDecoder.getPTS(pAvStreamVideo, pFrame);
+        double frameDelay = 0.0;
+        if (pts != 0) {
+            this->videoClock = pts;
         } else {
+            pts = this->videoClock;
+        }
+        frameDelay = av_q2d(pAvStreamVideo->codec->time_base);
+        frameDelay += pFrame->repeat_pict / (frameDelay * 2);
+        this->videoClock += frameDelay;
+        this->curFramePTS = pts;
+        this->delay = getDelay() * 1000 + 0.5;
+
+        SDL_UpdateYUVTexture(texture, nullptr, pFrame->data[0], pFrame->linesize[0],
+                             pFrame->data[1], pFrame->linesize[1],
+                             pFrame->data[2], pFrame->linesize[2]);
+        SDL_RenderCopy(renderer, texture, nullptr, nullptr);
+        SDL_RenderPresent(renderer);
+        SDL_UpdateWindowSurface(window);
+    } else {
+        if (pFrame) {
             av_free(pFrame);
-            break;
+            pFrame = nullptr;
         }
 
-        SDL_Delay(40);
     }
+
 }
 
 
@@ -98,6 +128,9 @@ int SDLDisplay::decodeAudioFrame(uint8_t *buff) {
 
         if (!packetQueueAudio->getPacket(pkt, 1))
             return -1;
+        if (pkt.pts != AV_NOPTS_VALUE) {
+            this->audioClock = pkt.pts * av_q2d(pAvStreamAudio->time_base);
+        }
         audio_pkt_size = pkt.size;
         while (0 < audio_pkt_size) {
 
@@ -122,13 +155,136 @@ void SDLDisplay::playAudio() {
     initAudioSpec();//init audio device
     static uint8_t audio_buff[192000 * 3 / 2];
     while (true) {
-        int len = decodeAudioFrame(audio_buff);
-        if (len < 0) {
+        if (this->playState == 2) {
+            SDL_Event event;
+            event.type = SDL_QUIT_EVENT;
+            SDL_PushEvent(&event);
             break;
         }
-        SDL_QueueAudio(1, audio_buff, len);
+        if (playState == 0) {
+            SDL_Delay(20);
+        } else if (this->playState == 1) {
+            int len = decodeAudioFrame(audio_buff);
+            if (len < 0) {
+                continue;
+            }
+            SDL_QueueAudio(1, audio_buff, len);
+        } else {
+            break;
+        }
+
     }
 
 }
+
+void SDLDisplay::refreshEvent() {
+    SDL_Event event;
+    while (true) {
+        if (this->playState == 2) {
+            event.type = SDL_QUIT_EVENT;
+            break;
+        }
+        if (this->playState == 1) {
+
+            event.type = SDL_REFRESH_EVENT;
+            SDL_PushEvent(&event);
+            std::cout << delay << std::endl;
+            SDL_Delay(delay);
+        } else if (this->playState == 0) {
+            SDL_Delay(20);
+        } else {
+            break;
+        }
+    }
+}
+
+void SDLDisplay::eventLoop() {
+    SDL_Event event;
+    while (true) {
+        if (this->playState == 2) {
+            break;
+        }
+        SDL_WaitEvent(&event);
+        switch (event.type) {
+            case SDL_REFRESH_EVENT: {
+                drawing();
+                break;
+            }
+            case SDL_KEYDOWN: {
+                const Uint8 *state = SDL_GetKeyboardState(nullptr);
+                if (state[SDL_SCANCODE_SPACE]) {
+                    if (this->playState == 1) {
+                        this->playState = 0;
+                        SDL_PauseAudio(1);
+                    } else if (this->playState == 0) {
+                        this->playState = 1;
+                        SDL_PauseAudio(0);
+                    }
+                }
+                if (state[SDL_SCANCODE_ESCAPE]) {
+                    this->playState = 2;
+                }
+                break;
+            }
+            case SDL_QUIT_EVENT: {
+                SDL_VideoQuit();
+                SDL_AudioQuit();
+                SDL_Quit();
+            }
+            default: {
+                break;
+            }
+        }
+
+    }
+
+}
+
+double SDLDisplay::getDelay() {
+    double retDelay = 0.0;
+    double frameDelay = 0.0;
+    double curAudioClock = 0.0;
+    double compare = 0.0;
+    double threshold = 0.0;
+
+    frameDelay = curFramePTS - preFramePTS;
+    if (frameDelay <= 0 || frameDelay >= 1.0) {
+        frameDelay = preCurFramePTS;
+    }
+
+    preCurFramePTS = frameDelay;
+    preFramePTS = curFramePTS;
+
+    curAudioClock = getAudioClock();
+
+
+    compare = curFramePTS - curAudioClock;
+
+
+    threshold = frameDelay;
+
+    if (compare <= -threshold) {
+        retDelay = frameDelay / 2;
+    } else if (compare >= threshold) {
+        retDelay = frameDelay * 2;
+    } else {
+        retDelay = frameDelay;
+    }
+
+    return retDelay;
+}
+
+double SDLDisplay::getAudioClock() {
+    long long bytesPerSec = 0;
+    double curAudioClock = 0.0;
+
+    bytesPerSec = pAvStreamAudio->codec->sample_rate
+                  * (this->audioDecoder.getPavCodecContext()->channels) * 2;
+
+    curAudioClock = this->audioClock / (double) bytesPerSec;
+
+    return curAudioClock;
+}
+
 
 

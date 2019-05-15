@@ -27,8 +27,8 @@
 #include <libavformat/avformat.h>
 #include <libswscale/swscale.h>
 
-#include <SDL.h>
-#include <SDL_thread.h>
+#include <SDL/SDL.h>
+#include <SDL/SDL_thread.h>
 
 #ifdef __MINGW32__
 #undef main /* Prevents SDL from overriding main() */
