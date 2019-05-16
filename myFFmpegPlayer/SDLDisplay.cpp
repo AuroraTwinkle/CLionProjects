@@ -5,7 +5,9 @@
 #include "SDLDisplay.h"
 
 
-SDLDisplay::SDLDisplay() : delay(0), playState(1), pAvStreamAudio(nullptr), pAvStreamVideo(nullptr), demuxer(Demuxer()),
+SDLDisplay::SDLDisplay() : preFramePTS(0.0), preCurFramePTS(0.0), curFramePTS(0.0), audioClock(0.0), videoClock(0.0),
+                           delay(20), playState(1), pAvStreamAudio(nullptr), pAvStreamVideo(nullptr),
+                           demuxer(Demuxer()),
                            window(nullptr),
                            texture(
                                    nullptr), renderer(nullptr), pAvCodecContext(nullptr) {}
@@ -54,37 +56,72 @@ SDLDisplay::~SDLDisplay() {
 
 
 void SDLDisplay::drawing() {
-
     AVFrame *pFrame = nullptr;
     pFrame = av_frame_alloc();
+    while (true) {
 
+        if (this->playState == 0) {
+            SDL_Delay(20);
+            continue;
+        }
+        if (videoDecoder.startDecode(packetQueueVideo, pFrame)) {
 
-    if (videoDecoder.startDecode(packetQueueVideo, pFrame)) {
+            double pts = videoDecoder.getPTS(pAvStreamVideo, pFrame);
+            double frameDelay = 0.0;
+            if (pts != 0) {
+                this->videoClock = pts;
+            } else {
+                pts = this->videoClock;
+            }
+            frameDelay = av_q2d(pAvStreamVideo->codec->time_base);
+            frameDelay += pFrame->repeat_pict / (frameDelay * 2);
+            this->videoClock += frameDelay;
+            this->curFramePTS = pts;
+            this->delay = getDelay() * 1000 + 0.5;
 
-        double pts = videoDecoder.getPTS(pAvStreamVideo, pFrame);
-        double frameDelay = 0.0;
-        if (pts != 0) {
-            this->videoClock = pts;
+            SDL_UpdateYUVTexture(texture, nullptr, pFrame->data[0], pFrame->linesize[0],
+                                 pFrame->data[1], pFrame->linesize[1],
+                                 pFrame->data[2], pFrame->linesize[2]);
+            SDL_RenderCopy(renderer, texture, nullptr, nullptr);
+            SDL_RenderPresent(renderer);
+            SDL_UpdateWindowSurface(window);
+            std::cout << "videoPTS = " << pts << "  videoClock = " << videoClock << "  audioClock = " << audioClock
+                      << "\r";
+            SDL_Delay(delay);
         } else {
-            pts = this->videoClock;
-        }
-        frameDelay = av_q2d(pAvStreamVideo->codec->time_base);
-        frameDelay += pFrame->repeat_pict / (frameDelay * 2);
-        this->videoClock += frameDelay;
-        this->curFramePTS = pts;
-        this->delay = getDelay() * 1000 + 0.5;
-
-        SDL_UpdateYUVTexture(texture, nullptr, pFrame->data[0], pFrame->linesize[0],
-                             pFrame->data[1], pFrame->linesize[1],
-                             pFrame->data[2], pFrame->linesize[2]);
-        SDL_RenderCopy(renderer, texture, nullptr, nullptr);
-        SDL_RenderPresent(renderer);
-        SDL_UpdateWindowSurface(window);
-    } else {
-        if (pFrame) {
-            av_free(pFrame);
+            av_frame_free(&pFrame);
             pFrame = nullptr;
+            break;
         }
+
+//    if (videoDecoder.startDecode(packetQueueVideo, pFrame)) {
+//
+//        double pts = videoDecoder.getPTS(pAvStreamVideo, pFrame);
+//        double frameDelay = 0.0;
+//        if (pts != 0) {
+//            this->videoClock = pts;
+//        } else {
+//            pts = this->videoClock;
+//        }
+//        frameDelay = av_q2d(pAvStreamVideo->codec->time_base);
+//        frameDelay += pFrame->repeat_pict / (frameDelay * 2);
+//        this->videoClock += frameDelay;
+//        this->curFramePTS = pts;
+//        this->delay = getDelay() * 1000 + 0.5;
+//
+//        SDL_UpdateYUVTexture(texture, nullptr, pFrame->data[0], pFrame->linesize[0],
+//                             pFrame->data[1], pFrame->linesize[1],
+//                             pFrame->data[2], pFrame->linesize[2]);
+//        SDL_RenderCopy(renderer, texture, nullptr, nullptr);
+//        SDL_RenderPresent(renderer);
+//        SDL_UpdateWindowSurface(window);
+//        av_frame_free(&pFrame);
+//        pFrame = nullptr;
+//    } else {
+//        if (pFrame) {
+//            av_frame_free(&pFrame);
+//            pFrame = nullptr;
+//        }
 
     }
 
@@ -130,6 +167,7 @@ int SDLDisplay::decodeAudioFrame(uint8_t *buff) {
             return -1;
         if (pkt.pts != AV_NOPTS_VALUE) {
             this->audioClock = pkt.pts * av_q2d(pAvStreamAudio->time_base);
+//            std::cout<<audioClock<<std::endl;
         }
         audio_pkt_size = pkt.size;
         while (0 < audio_pkt_size) {
@@ -155,14 +193,9 @@ void SDLDisplay::playAudio() {
     initAudioSpec();//init audio device
     static uint8_t audio_buff[192000 * 3 / 2];
     while (true) {
-        if (this->playState == 2) {
-            SDL_Event event;
-            event.type = SDL_QUIT_EVENT;
-            SDL_PushEvent(&event);
-            break;
-        }
         if (playState == 0) {
             SDL_Delay(20);
+            continue;
         } else if (this->playState == 1) {
             int len = decodeAudioFrame(audio_buff);
             if (len < 0) {
@@ -177,39 +210,38 @@ void SDLDisplay::playAudio() {
 
 }
 
-void SDLDisplay::refreshEvent() {
-    SDL_Event event;
-    while (true) {
-        if (this->playState == 2) {
-            event.type = SDL_QUIT_EVENT;
-            break;
-        }
-        if (this->playState == 1) {
-
-            event.type = SDL_REFRESH_EVENT;
-            SDL_PushEvent(&event);
-            std::cout << delay << std::endl;
-            SDL_Delay(delay);
-        } else if (this->playState == 0) {
-            SDL_Delay(20);
-        } else {
-            break;
-        }
-    }
-}
+//void SDLDisplay::refreshEvent() {
+//
+//    while (true) {
+//        SDL_Event event;
+//        if (this->playState == 2) {
+//            event.type = SDL_QUIT_EVENT;
+//            break;
+//        }
+//        else if (this->playState == 1) {
+//            event.type = SDL_REFRESH_EVENT;
+//            SDL_PushEvent(&event);
+//            //std::cout << delay << std::endl;
+//            SDL_Delay(delay);
+//        } else if (this->playState == 0) {
+//            SDL_Delay(20);
+//        } else {
+//            break;
+//        }
+//    }
+//}
 
 void SDLDisplay::eventLoop() {
+
     SDL_Event event;
     while (true) {
+
         if (this->playState == 2) {
             break;
         }
+
         SDL_WaitEvent(&event);
         switch (event.type) {
-            case SDL_REFRESH_EVENT: {
-                drawing();
-                break;
-            }
             case SDL_KEYDOWN: {
                 const Uint8 *state = SDL_GetKeyboardState(nullptr);
                 if (state[SDL_SCANCODE_SPACE]) {
@@ -243,7 +275,6 @@ void SDLDisplay::eventLoop() {
 double SDLDisplay::getDelay() {
     double retDelay = 0.0;
     double frameDelay = 0.0;
-    double curAudioClock = 0.0;
     double compare = 0.0;
     double threshold = 0.0;
 
@@ -255,10 +286,7 @@ double SDLDisplay::getDelay() {
     preCurFramePTS = frameDelay;
     preFramePTS = curFramePTS;
 
-    curAudioClock = getAudioClock();
-
-
-    compare = curFramePTS - curAudioClock;
+    compare = curFramePTS - this->audioClock;
 
 
     threshold = frameDelay;
@@ -272,18 +300,6 @@ double SDLDisplay::getDelay() {
     }
 
     return retDelay;
-}
-
-double SDLDisplay::getAudioClock() {
-    long long bytesPerSec = 0;
-    double curAudioClock = 0.0;
-
-    bytesPerSec = pAvStreamAudio->codec->sample_rate
-                  * (this->audioDecoder.getPavCodecContext()->channels) * 2;
-
-    curAudioClock = this->audioClock / (double) bytesPerSec;
-
-    return curAudioClock;
 }
 
 

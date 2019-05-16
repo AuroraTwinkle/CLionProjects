@@ -26,7 +26,7 @@ int main(int argc,const char *argv[]) {
     demuxThread.detach();
     std::thread playAudio(&SDLDisplay::playAudio,&player);
     playAudio.detach();
-    std::thread refreshThread(&SDLDisplay::refreshEvent,&player);
+    std::thread refreshThread(&SDLDisplay::drawing,&player);
     refreshThread.detach();
     player.eventLoop();
 

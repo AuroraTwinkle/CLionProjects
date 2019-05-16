@@ -22,8 +22,7 @@ extern "C" {
 #include <string>
 #include <thread>
 
-#define SDL_REFRESH_EVENT (SDL_USEREVENT + 1)
-#define SDL_QUIT_EVENT (SDL_USEREVENT+2)
+#define SDL_QUIT_EVENT (SDL_USEREVENT+1)
 
 class SDLDisplay {
 public:
@@ -39,12 +38,13 @@ public:
 
     void playAudio();
 
-    void refreshEvent();
+    //void refreshEvent();
 
     void eventLoop();
+    void drawing();
 
 private:
-    void drawing();
+
 
     bool initAudioSpec();
 
@@ -52,7 +52,6 @@ private:
 
     double getDelay();
 
-    double getAudioClock();
 
 private:
     SDL_Window *window;
@@ -73,13 +72,12 @@ private:
 
     int playState;
 
-    unsigned int audioBufIndex{0};
-    double audioClock{0.0};
-    double videoClock{0.0};
-    double preFramePTS{0.0};
-    double curFramePTS{0.0};
-    double preCurFramePTS{0.0};
-    uint32_t delay;
+    double audioClock;
+    double videoClock;
+    double preFramePTS;
+    double curFramePTS;
+    double preCurFramePTS;
+    int delay;
 };
 
 
