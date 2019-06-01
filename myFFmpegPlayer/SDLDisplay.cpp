@@ -246,8 +246,8 @@ void SDLDisplay::eventLoop() {
                 const Uint8 *state = SDL_GetKeyboardState(nullptr);
                 if (state[SDL_SCANCODE_SPACE]) {
                     if (this->playState == 1) {
-                        this->playState = 0;
-                        SDL_PauseAudio(1);
+//                        this->playState = 0;
+//                        SDL_PauseAudio(1);
                     } else if (this->playState == 0) {
                         this->playState = 1;
                         SDL_PauseAudio(0);
